@@ -2,10 +2,11 @@
 
 import numpy as np
 from classifier_loss import risk
+from sub_problem import label_params
 import scipy.stats
 from joblib import Parallel, delayed
 import scipy.sparse
-import time
+# import time
 
 
 class PUExtraTrees:
@@ -16,7 +17,8 @@ class PUExtraTrees:
                  min_samples_leaf = 1, 
                  max_features = 'auto', 
                  max_candidates = 1, 
-                 n_jobs = 1):
+                 n_jobs = 1,
+                 normalise_reduction = False):
         """
         
 
@@ -29,7 +31,7 @@ class PUExtraTrees:
         criterion : {"gini", "entropy"}, optional
             The function to measure the quality of a split. Supported criteria are “gini” for the Gini impurity and “entropy” for the information gain. The default is 'gini'.
         max_depth : int or None, optional
-            The maximum depth of the tree. If None, then nodes are expanded until all leaves are pure or until all leaves contain less than min_samples_leaf samples. The default is None.
+            The maximum depth of any tree in the forest. If None, then nodes are expanded until all leaves are pure or until all leaves contain less than min_samples_leaf samples. The default is None.
         min_samples_leaf : int, optional
             The minimum number of samples required to be at a leaf node. The default is 1.
         max_features : int or {"auto", "all"}, optional
@@ -38,7 +40,9 @@ class PUExtraTrees:
             Number of randomly chosen split points to consider for each candidate feature. The default is 1.
         n_jobs : int, optional
             The number of jobs to run in parallel. fit, predict and predict_proba are all parallelized over the trees. The default is 1.
-
+        normalise_reduction : bool, optional
+            Whether to normalise the risk reduction. The corresponding normalised risk reduction importance will in turn make many features appear more important as the amount of data at each node is disregarded.
+        
         Returns
         -------
         None.
@@ -57,9 +61,11 @@ class PUExtraTrees:
         self.n_jobs = n_jobs
         self.p = None
         self.current_max_depth = 0
+        self.normalise_reduction = normalise_reduction
         
         self.nodes = [{(0,0): {'data': None, 'j': None, 'xi': None, 'g': None, 
-                               'is_leaf': None, 'loss': None, 'impurity_decrease': None}} 
+                               'is_leaf': None, 'loss': None, 
+                               'impurity_decrease': None}} 
                       for i in range(self.n_estimators)]
         
         
@@ -101,7 +107,6 @@ class PUExtraTrees:
     def get_parent(self, node, tree, return_truth_val):
         """
         Return parent node of the specified node in "tree". 
-        Scratch everything, just assume everything works so no checks
 
         Parameters
         ----------
@@ -170,7 +175,7 @@ class PUExtraTrees:
 
     def fit(self, P = None, U = None, N = None, pi = None):
         """
-        
+        Fit the random forest.
 
         Parameters
         ----------
@@ -179,10 +184,9 @@ class PUExtraTrees:
         U : array-like of shape (n_u, n_features), optional
             Unlabelled training samples. The default is None.
         N : array-like of shape (n_n, n_features), optional
-            Training samples from the negative class. The default is None.
+            Training samples from the negative class if performing PN learning. The default is None.
         pi : float or None, optional
-            Prior probability that an example belongs to the positive class. If pi = None and self.estimator in {"uPU", "nnPU"} then we will attempt to estimate pi from the data. The default is None.
-
+            Prior probability that an example belongs to the positive class.
         Returns
         -------
         self
@@ -194,6 +198,8 @@ class PUExtraTrees:
             X = np.concatenate((P, U), axis = 0)
             y = np.concatenate((np.ones(len(P)), np.zeros(len(U))))
         elif self.estimator in ['PN']:
+            # print('P', P)
+            # print('N',N)
             X = np.concatenate((P, N), axis = 0)
             y = np.concatenate((np.ones(len(P)), -np.ones(len(N))))
         
@@ -205,9 +211,8 @@ class PUExtraTrees:
         n_n = (y == -1).sum()
         self.pi = pi
                 
-        if self.pi is None:
-            print('Please specify pi')
-            break
+        if (self.pi is None) and (self.estimator in ['uPU', 'nnPU']):
+            print('Please provide pi')
 
                 
         if self.max_features == 'auto':
@@ -240,15 +245,24 @@ class PUExtraTrees:
         
         def impurity_split(sigma, j, xi):
             mask = (X[sigma, j] <= xi).flatten()
-                                        
-            nwT = len(y[sigma][mask])
-            nwF = len(y[sigma][~mask])
+            nwu = (y[sigma] == 0).sum()
+            nwTu = (y[sigma][mask] == 0).sum()
+            nwFu = (y[sigma][~mask] == 0).sum()
             
             imT = impurity_node(y[sigma][mask])
             imF = impurity_node(y[sigma][~mask])
-        
-            weight_T = 1
-            weight_F = 1
+            
+            if self.normalise_reduction:
+                if self.estimator in ['uPU', 'nnPU']:            
+                    weight_T = nwTu/nwu
+                    weight_F = nwFu/nwu
+                
+                elif self.estimator == 'PN':
+                    weight_T = len(y[sigma][mask])/len(y[sigma])
+                    weight_F = len(y[sigma][~mask])/len(y[sigma])
+            else:
+                weight_T = 1
+                weight_F = 1
                         
             return weight_T * imT + weight_F * imF
         
@@ -272,11 +286,17 @@ class PUExtraTrees:
                 
                 if self.estimator == 'uPU':
                     if self.criterion == 'gini':
-                        return (nwu/n_u)*ystar*(1-ystar)
+                        if self.normalise_reduction:
+                            return 4*ystar*(1-ystar)
+                        else:
+                            return 4*(nwu/n_u)*ystar*(1-ystar)
                     
                     elif self.criterion == 'entropy':
                         if (wpk > 0) and (wnk > 0):
-                            return (nwu/n_u)*(-ystar * np.log(ystar) - (1-ystar) * np.log(1-ystar))
+                            if self.normalise_reduction:
+                                return (-ystar * np.log(ystar) - (1-ystar) * np.log(1-ystar))
+                            else:
+                                return (nwu/n_u)*(-ystar * np.log(ystar) - (1-ystar) * np.log(1-ystar))
                         elif (ystar == 1) or (ystar == 0):
                             return 0
                         else:
@@ -287,11 +307,17 @@ class PUExtraTrees:
                         if (wnk <= 0): #pure positive
                             return 0
                         else:
-                            return (nwu/n_u)*ystar*(1-ystar)
+                            if self.normalise_reduction:
+                                return 4*ystar*(1-ystar)
+                            else:
+                                return 4*(nwu/n_u)*ystar*(1-ystar)
                         
                     elif self.criterion == 'entropy':
                         if (wpk > 0) and (wnk > 0):
-                            return (nwu/n_u)*(-ystar * np.log(ystar) - (1-ystar) * np.log(1-ystar))
+                            if self.normalise_reduction:
+                                return (-ystar * np.log(ystar) - (1-ystar) * np.log(1-ystar))
+                            else:
+                                return (nwu/n_u)*(-ystar * np.log(ystar) - (1-ystar) * np.log(1-ystar))
                         else:
                             return 0
                             
@@ -299,15 +325,22 @@ class PUExtraTrees:
                 nwp = (y_sigma == 1).sum()
                 nwn = (y_sigma == -1).sum()
                 ystar = self.pi*nwp/n_p /(self.pi*nwp/n_p + (1-self.pi)*nwn/n_n)
+                               
                 
                 if self.criterion == 'gini':
-                    return ((nwp+nwn)/n)*ystar*(1-ystar)
+                    if self.normalise_reduction:
+                        return 4*ystar*(1-ystar)
+                    else:
+                        return 4*((nwp+nwn)/n)*ystar*(1-ystar)
                 
                 elif self.criterion == 'entropy':
                     if (ystar == 0) or (ystar == 1):
                         return 0
                     else:
-                        return ((nwp+nwn)/n)*(-ystar * np.log(ystar) - (1-ystar) * np.log(1-ystar))
+                        if self.normalise_reduction:
+                            return -ystar * np.log(ystar) - (1-ystar) * np.log(1-ystar)
+                        else:
+                            return ((nwp+nwn)/n)*(-ystar * np.log(ystar) - (1-ystar) * np.log(1-ystar))
         
         
         def regional_prediction_function(sigma, return_risk = False):            
@@ -335,10 +368,14 @@ class PUExtraTrees:
             impurity = impurity_node(y[sigma])
             
             # check node pure
+            # risk cannot be reduced further in these cases
             if self.estimator in ['nnPU', 'PN']:
                 c1 = impurity > 0 
             elif self.estimator == 'uPU':
-                c1 = impurity > -float('inf')            
+                if y[sigma].sum() == 0:
+                    c1 = impurity > 0 
+                else:
+                    c1 = impurity > -float('inf')            
             
             # check max depth reached
             if self.max_depth is None:
@@ -390,7 +427,7 @@ class PUExtraTrees:
                 self.nodes[tree][node]['j'] = int(best_attribute)
                 self.nodes[tree][node]['xi'] = best_cut_point
                 self.nodes[tree][node]['impurity_decrease'] = impurity - impurities[minimiser]
-
+            
                 # create successors of current node
                 self.create_successor(node, tree, 'T')
                 self.create_successor(node, tree, 'F')
@@ -400,12 +437,17 @@ class PUExtraTrees:
                 sigma_T = data_at_node(succs[0], tree)
                 sigma_F = data_at_node(succs[1], tree)                
                 
+                #keep tabs on how training is going
                 if node[0] > self.current_max_depth:
                     self.current_max_depth = node[0]
-
+                
+                # construct_subtree on the sucessors
                 construct_subtree(succs[0], tree, sigma_T)
                 construct_subtree(succs[1], tree, sigma_F)
         
+        # train the ensemble        
+        #for tree in range(self.n_estimators):
+        #    construct_subtree((0,0), tree, np.ones(n).astype(bool))
         Parallel(n_jobs = min(self.n_jobs, self.n_estimators), prefer="threads")(delayed(construct_subtree)((0,0), i, np.ones(n).astype(bool)) for i in range(self.n_estimators))
         self.is_trained = True
         return self
@@ -455,6 +497,10 @@ class PUExtraTrees:
         
         # first check to see if the tree is empty/trained
         if self.is_trained:
+            # predictions = np.zeros([self.n_estimators, len(X)])
+            # for tree in range(self.n_estimators):
+            #     predictions[tree] = predict_single_tree(tree)
+            
             predictions = Parallel(n_jobs = min(self.n_jobs, self.n_estimators), require='sharedmem')(delayed(predict_single_tree)(tree) for tree in range(self.n_estimators))
             return scipy.stats.mode(np.array(predictions), axis = 0)[0][0]
         else:
@@ -509,6 +555,29 @@ class PUExtraTrees:
         for tree in range(self.n_estimators):
             for node in self.nodes[tree]:
                 if self.nodes[tree][node]['j'] is not None:
-                    impurities[tree, self.nodes[tree][node]['j']] += self.nodes[tree][node]['impurity_decrease'] 
+                    impurities[tree, self.nodes[tree][node]['j']] += self.nodes[tree][node]['impurity_decrease']
         
-        return impurities.mean(axis = 0)
+        temp = impurities.mean(axis = 0)
+        return temp#/temp.sum()
+    
+
+    def class_importances(self, label):
+        importances = np.zeros([self.n_estimators, self.d])
+        for tree in range(self.n_estimators):
+            subtree = [] # not including leaf nodes
+            for node in self.nodes[tree]:
+                if self.nodes[tree][node]['is_leaf']:
+                    if self.nodes[tree][node]['g'] == label:
+                        chain = self.get_ancestory(node, tree)[0]
+                        for node_ in chain:
+                            if node_ not in subtree:
+                                subtree += [node_]
+            
+            for node in subtree:
+                att = self.nodes[tree][node]['j']
+                importances[tree, att] += self.nodes[tree][node]['impurity_decrease']
+        
+        importances = importances.mean(axis = 0)
+            
+        return importances#/importances.sum()
+
