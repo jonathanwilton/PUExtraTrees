@@ -18,6 +18,7 @@ g = PUExtraTrees(n_estimators = 10,
                  min_samples_leaf = 1, 
                  max_features = 'auto', 
                  max_candidates = 1, 
+                 normalise_reduction = False,
                  n_jobs = 10)
 
 g.fit(P = X_train[y_train == 1], N = X_train[y_train == -1], pi = pi)
