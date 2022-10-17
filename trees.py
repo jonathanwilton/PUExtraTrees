@@ -1,11 +1,11 @@
-# forest beta
+# PU ExtraTrees - A Random Forest Classifier for PU Learning
 from tree import PUExtraTree
 from joblib import Parallel, delayed
 import scipy
 import numpy as np
 
 class PUExtraTrees:
-    def __init__(self, n_estimators = 1,
+    def __init__(self, n_estimators = 100,
                  risk_estimator = 'nnPU',
                  loss = 'quadratic',
                  max_depth = None, 
@@ -81,7 +81,7 @@ class PUExtraTrees:
                         min_samples_leaf = self.min_samples_leaf, 
                         max_features = self.max_features, 
                         max_candidates = self.max_candidates)
-        g.fit(P = P, U = U, pi = pi)
+        g.fit(P = P, U = U, N = N, pi = pi)
         return g
     
     def predict_tree(self, g, X):
@@ -144,4 +144,69 @@ class PUExtraTrees:
         """
         self.preds = Parallel(n_jobs = min(self.n_jobs, self.n_estimators), prefer="threads")(delayed(self.predict_tree)(g, X) for g in self.gs)
         return scipy.stats.mode(np.array(self.preds), axis = 0)[0][0]
+    
+    def n_leaves(self, tree):
+        """
+        Get the number of leaf nodes in a specified tree
+
+        Parameters
+        ----------
+        tree : int
+            The index of the tree.
+
+        Returns
+        -------
+        Number of leaf nodes in the specified tree.
+
+        """
+        
+        return self.gs[tree].n_leaves()
+    
+    def get_depth(self, tree):
+        """
+        Get the depth of a specified tree in the forest.
+
+        Parameters
+        ----------
+        tree : int
+            The index of the tree.
+
+        Returns
+        -------
+        Depth of the specified tree.
+
+        """
+        
+        return self.gs[tree].get_depth()
+    
+    def get_max_depth(self):
+        """
+        Return the depth of the deepest tree in the forest.
+
+        Returns
+        -------
+        Maximum depth : int
+
+        """
+        
+        depths = []
+        for tree in self.gs:
+            depths += [tree.get_depth()]
+        return np.max(depths)
+    
+    def feature_importances(self):
+        """
+        Get the risk reduction feature importances.
+
+        Returns
+        -------
+        importances : array of shape (n_features,)
+            The risk reduction feature importances.
+
+        """
+        importances = np.zeros([self.gs[0].d])
+        for tree in self.gs:
+            importances += tree.feature_importances()/self.n_estimators
+        
+        return importances
         

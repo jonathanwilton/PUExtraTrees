@@ -18,7 +18,7 @@ g = PUExtraTrees(n_estimators = 10,
                  min_samples_leaf = 1, 
                  max_features = 'sqrt', 
                  max_candidates = 1, 
-                 n_jobs = 10)
+                 n_jobs = 4)
 
 g.fit(P = X_train[y_train == 1], N = X_train[y_train == -1], pi = pi)
 predictions = g.predict(X_test)
@@ -33,9 +33,9 @@ f = 2*TP/(2*TP+FP+FN)
 print('Accuracy', acc)
 print('F score', f)
 
-print('Number of leaves in 6th tree of forest:', g.n_leaves(5))
-print('Maximum depth of any tree in forest:', g.current_max_depth)
-print('Depth of the first tree in forest', g.get_depth(0))
+print('Number of leaves in 3rd tree of forest:', g.n_leaves(3-1))
+print('Maximum depth of any tree in forest:', g.get_max_depth())
+print('Depth of the 3rd tree in forest', g.get_depth(3-1))
 
 importances = g.feature_importances()
 plt.figure()

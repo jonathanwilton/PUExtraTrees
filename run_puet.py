@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.datasets import fetch_openml
 from trees import PUExtraTrees
+# from tree import PUExtraTree
 import matplotlib.pyplot as plt
 
 # fetch mnist digits
@@ -20,7 +21,7 @@ positive_indices = np.random.choice(np.where(y_train == 1)[0], size = n_p, repla
 P = X_train[positive_indices]
 U = X_train.copy()
 
-g = PUExtraTrees(n_estimators = 40, 
+g = PUExtraTrees(n_estimators = 10, 
                  risk_estimator = 'nnPU',
                  loss = 'quadratic',
                  max_depth = None, 
@@ -29,7 +30,8 @@ g = PUExtraTrees(n_estimators = 40,
                  max_candidates = 1, 
                  n_jobs = 4)
 
-g.fit(P=P, U=P, pi=pi)
+
+g.fit(P=P, U=U, pi=pi)
 predictions = g.predict(X_test)
 
 TP = (predictions[y_test == 1] == 1).sum()
@@ -42,9 +44,9 @@ f = 2*TP/(2*TP+FP+FN)
 print('Accuracy', acc)
 print('F score', f)
 
-print('Number of leaves in 6th tree of forest:', g.n_leaves(5))
-print('Maximum depth of any tree in forest:', g.current_max_depth)
-print('Depth of the first tree in forest', g.get_depth(0))
+print('Number of leaves in 3rd tree of forest:', g.n_leaves(3-1))
+print('Maximum depth of any tree in forest:', g.get_max_depth())
+print('Depth of the 3rd tree in forest', g.get_depth(3-1))
 
 importances = g.feature_importances()
 plt.figure()

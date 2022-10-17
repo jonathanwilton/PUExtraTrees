@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 X, y = fetch_openml('mnist_784', return_X_y = True, as_frame = False)
 y = y.astype(np.int8)
-y[y != 0] = -1 # 1 -> 9 forms N class
-y[y == 0] = 1 # 0 forms P class
+y[y % 2 == 1] = -1 # Odd digits form N class
+y[y % 2 == 0] = 1 # Even digits form P class
 pi = (y == 1).mean()
 X_train, y_train, X_test, y_test = X[:60000], y[:60000], X[60000:], y[60000:]
 

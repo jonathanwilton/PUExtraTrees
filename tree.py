@@ -1,5 +1,4 @@
-# PU ExtraTree
-
+# PU ExtraTree - A DT Classifier for PU Learning
 import numpy as np
 import scipy.stats
 import scipy.sparse
@@ -194,7 +193,6 @@ class PUExtraTree:
         n_n = (y == -1).sum()
         self.pi = pi
         
-        # if (self.pi is None) and (self.risk_estimator in ['uPU', 'nnPU']):
         if self.pi is None:
             print('please specify pi')
                 
@@ -229,8 +227,8 @@ class PUExtraTree:
         def impurity_node(y_sigma):
             # impurity of single node
             if self.risk_estimator in ["uPU", "nnPU"]:
-                Wp = (y_sigma == 1).sum() * self.pi/(y == 1).sum()
-                Wn = (y_sigma == 0).sum()/(y == 0).sum() - Wp
+                Wp = (y_sigma == 1).sum() * self.pi/n_p
+                Wn = (y_sigma == 0).sum()/n_u - Wp
                 
                 if Wp + Wn == 0:
                     vstar = float('inf')
@@ -238,8 +236,8 @@ class PUExtraTree:
                     vstar = Wp/(Wp + Wn)
                     
             elif self.risk_estimator in ['PN']:
-                Wp = (y_sigma == 1).sum() * self.pi/(y == 1).sum()
-                Wn = (y_sigma == -1).sum() * (1-self.pi)/(y == -1).sum()
+                Wp = (y_sigma == 1).sum() * self.pi/n_p
+                Wn = (y_sigma == -1).sum() * (1-self.pi)/n_n
                 
                 if Wp + Wn == 0:
                     vstar = float('inf')
@@ -275,8 +273,8 @@ class PUExtraTree:
 
         def regional_prediction_function(y_sigma):            
             if self.risk_estimator in ["uPU", "nnPU"]:
-                Wp = (y_sigma == 1).sum() * self.pi/(y == 1).sum()
-                Wn = (y_sigma == 0).sum()/(y == 0).sum() - Wp
+                Wp = (y_sigma == 1).sum() * self.pi/n_p
+                Wn = (y_sigma == 0).sum()/n_u - Wp
                 
                 if Wp + Wn == 0:
                     vstar = float('inf')
@@ -284,8 +282,8 @@ class PUExtraTree:
                     vstar = Wp/(Wp + Wn)
             
             elif self.risk_estimator in ["PN"]:
-                Wp = (y_sigma == 1).sum() * self.pi/(y == 1).sum()
-                Wn = (y_sigma == -1).sum() * (1-self.pi)/(y == -1).sum()
+                Wp = (y_sigma == 1).sum() * self.pi/n_p
+                Wn = (y_sigma == -1).sum() * (1-self.pi)/n_n
                 
                 if Wp + Wn == 0:
                     vstar = float('inf')
@@ -319,19 +317,17 @@ class PUExtraTree:
             else:
                 c2 = node[0] < self.max_depth # max depth reached
             c3 = self.min_samples_leaf < sigma.sum() # minimum samples in node reached
-            
             att_ptp = np.ptp(X[sigma], axis = 0)
             c4 = att_ptp.sum() > 0 # check if there is any variability in features
             # c4 = np.unique(X[sigma], axis = 0).shape[0] > 1
-            
             # check if any of the criteria satisfied
             # if so, turn into a leaf node
             if c1*c2*c3*c4 == 0:
                 self.nodes[node]['is_leaf'] = True
                 lab = regional_prediction_function(y[sigma])
                 self.nodes[node]['g'] = lab
-                self.leaf_count += 1
                 self.nodes[node]['risk_reduction'] = 0
+                self.leaf_count += 1
             else:
                 self.nodes[node]['is_leaf'] = False
                 # find valid nodes that can be used for a split
