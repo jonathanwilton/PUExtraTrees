@@ -12,13 +12,12 @@ pi = (y == 1).mean()
 X_train, y_train, X_test, y_test = X[:60000], y[:60000], X[60000:], y[60000:]
 
 g = PUExtraTrees(n_estimators = 10, 
-                 estimator = 'PN',
-                 criterion = 'gini',
+                 risk_estimator = 'PN',
+                 loss = 'quadratic',
                  max_depth = None, 
                  min_samples_leaf = 1, 
-                 max_features = 'auto', 
+                 max_features = 'sqrt', 
                  max_candidates = 1, 
-                 normalise_reduction = False,
                  n_jobs = 10)
 
 g.fit(P = X_train[y_train == 1], N = X_train[y_train == -1], pi = pi)

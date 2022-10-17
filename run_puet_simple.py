@@ -16,6 +16,6 @@ P = X_train[positive_indices]
 U = X_train.copy()
 
 g = PUExtraTrees()
-g.fit(P, U, pi = pi)
+g.fit(P=P, U=U, pi = pi)
 predictions = g.predict(X_test)
 print('Accuracy', (predictions == y_test).mean())

@@ -20,17 +20,16 @@ positive_indices = np.random.choice(np.where(y_train == 1)[0], size = n_p, repla
 P = X_train[positive_indices]
 U = X_train.copy()
 
-g = PUExtraTrees(n_estimators = 100, 
-                 estimator = 'nnPU',
-                 criterion = 'gini',
+g = PUExtraTrees(n_estimators = 40, 
+                 risk_estimator = 'nnPU',
+                 loss = 'quadratic',
                  max_depth = None, 
                  min_samples_leaf = 1, 
-                 max_features = 'auto', 
+                 max_features = 'sqrt', 
                  max_candidates = 1, 
-                 normalise_reduction = False,
-                 n_jobs = 10)
+                 n_jobs = 4)
 
-g.fit(P, U, pi = pi)
+g.fit(P=P, U=P, pi=pi)
 predictions = g.predict(X_test)
 
 TP = (predictions[y_test == 1] == 1).sum()
