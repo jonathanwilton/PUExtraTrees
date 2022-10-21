@@ -1,7 +1,6 @@
 import numpy as np
 from sklearn.datasets import fetch_openml
 from trees import PUExtraTrees
-# from tree import PUExtraTree
 import matplotlib.pyplot as plt
 
 # fetch mnist digits
