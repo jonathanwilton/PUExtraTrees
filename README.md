@@ -2,6 +2,8 @@
 
 We propose new random forest algorithms for PU-learning that recursively and greedily minimise PU-data based estimators of the expected risk. Unbiased (uPU) and nonnegative (nnPU) risk estimators are both supported with either one of the quadratic or logistic loss. Using the quadratic loss and logistic loss are equivalent to using the Gini and entropy impurities in traditional (PN) random forests.
 
+Paper: https://arxiv.org/pdf/2210.08461
+
 ## How to use PU ET
 A minimal working example usage of PU ET is found in ```run_puet_simple.py```. Alternatively, ```run_puet.py``` demonstrates how to make use of more functionality. The implementation also supports PN learning, with example given in ```run_pnet.py```.
 
