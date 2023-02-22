@@ -143,7 +143,7 @@ class PUExtraTrees:
 
         """
         self.preds = Parallel(n_jobs = min(self.n_jobs, self.n_estimators), prefer="threads")(delayed(self.predict_tree)(g, X) for g in self.gs)
-        return scipy.stats.mode(np.array(self.preds), axis = 0)[0][0]
+        return scipy.stats.mode(np.array(self.preds), axis = 0, keepdims = False)[0]
     
     def n_leaves(self, tree):
         """
