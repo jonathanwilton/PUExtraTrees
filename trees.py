@@ -1,5 +1,5 @@
 # PU ExtraTrees - A Random Forest Classifier for PU Learning
-from .tree import PUExtraTree
+from tree import PUExtraTree
 from joblib import Parallel, delayed
 import scipy
 import numpy as np
